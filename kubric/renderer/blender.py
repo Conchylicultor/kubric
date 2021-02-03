@@ -105,11 +105,11 @@ class Blender(core.View):
 
   @property
   def use_denoising(self) -> bool:
-    return self.blender_scene.view_layers[0].cycles.use_denoising
+    return self.blender_scene.cycles.use_denoising
 
   @use_denoising.setter
   def use_denoising(self, value: bool):
-    self.blender_scene.view_layers[0].cycles.use_denoising = value
+    self.blender_scene.cycles.use_denoising = value
 
   @property
   def samples_per_pixel(self) -> int:
@@ -127,11 +127,11 @@ class Blender(core.View):
   def background_transparency(self, value: bool):
     self.blender_scene.render.film_transparent = value
 
-  def save_state(self, path: Union[pathlib.Path, str], pack_textures: bool = True):
+  def save_state(self, path: Union[pathlib.Path, str] = "scene.blend", pack_textures: bool = True):
     path = pathlib.Path(path)
-    path = path / "scene.blend"
+    path.parent.mkdir(parents=True, exist_ok=True)
 
-    # delete first, as blender auto-renames savefiles otherwise
+  # delete first, as blender auto-renames savefiles otherwise
     if path.is_file():
       logger.info(f"Overwriting {path}")
       path.unlink()
@@ -256,6 +256,10 @@ class Blender(core.View):
                                axis_forward=obj.front, axis_up=obj.up)
     assert len(bpy.context.selected_objects) == 1
     blender_obj = bpy.context.selected_objects[0]
+
+    # deactivate auto_smooth because for some reason it lead to no smoothing at all
+    # TODO: make smoothing configurable
+    blender_obj.data.use_auto_smooth = False
 
     register_object3d_setters(obj, blender_obj)
     obj.observe(AttributeSetter(blender_obj, 'active_material',

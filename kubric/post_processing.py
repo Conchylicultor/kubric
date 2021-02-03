@@ -18,6 +18,7 @@ import Imath
 from typing import Dict, Sequence
 import kubric.assets
 
+
 def read_channels_from_exr(exr: OpenEXR.InputFile, channel_names: Sequence[str]) -> np.ndarray:
   """Reads a single channel from an EXR file and returns it as a numpy array."""
   channels_header = exr.header()["channels"]
@@ -56,10 +57,8 @@ def get_render_layers_from_exr(filename, background_objects=(), objects=()) -> D
     # TODO: clip to a reasonable value. Is measured in meters so usual range is ~ [0, 10]
     output["Depth"] = read_channels_from_exr(exr, ["Depth.V"])
   if "Vector" in layer_names:
-    # TODO: The vector output of Blender is supposed to have 4 components, but has only 3 (XYZ)
-    #       The first two should be movement wrt. previous frame, the other two wrt. next frame.
-    #       No idea what the 3rd is about. Maybe it is actually scene flow?
-    output["Vector"] = read_channels_from_exr(exr, ["Vector.X", "Vector.Y", "Vector.Z"])
+    # Vector.Z output is useless
+    output["Vector"] = read_channels_from_exr(exr, ["Vector.X", "Vector.Y"])
   if "Normal" in layer_names:
     # range: [-1, 1]
     output["Normal"] = read_channels_from_exr(exr, ["Normal.X", "Normal.Y", "Normal.Z"])
@@ -79,10 +78,8 @@ def get_render_layers_from_exr(filename, background_objects=(), objects=()) -> D
     index_channels = [n + "." + c for n in crypto_layers for c in "RB"]
     idxs = read_channels_from_exr(exr, index_channels)
     idxs.dtype = np.uint32
-    output["SegmentationIndex"] = idxs
     alpha_channels = [n + "." + c for n in crypto_layers for c in "GA"]
     alphas = read_channels_from_exr(exr, alpha_channels)
-    output["SegmentationAlpha"] = alphas
     # replace crypto-ids with object index for foreground objects and 0 for background objects
     bg_ids = [kubric.assets.mm3hash(obj.uid) for obj in background_objects]
     object_ids = [kubric.assets.mm3hash(obj.uid) for obj in objects]
@@ -90,6 +87,9 @@ def get_render_layers_from_exr(filename, background_objects=(), objects=()) -> D
       idxs[idxs == bg_id] = 0  # assign 0 to all background objects
     for i, object_id in enumerate(object_ids):
       idxs[idxs == object_id] = i + 1
+
+    output["SegmentationIndex"] = idxs.astype(np.uint8)
+    output["SegmentationAlpha"] = alphas
 
   return output
 
